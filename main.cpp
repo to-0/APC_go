@@ -28,26 +28,26 @@ int free_places(char stone_type, int row, int column, int previous_row, int prev
 	if (previous_row == row && previous_column == column)
 		return 0;
 	int stones{ 0 };
-	if (column + 1 < board.size) {
+	if ((column + 1) < board.size && !(row == previous_row && previous_column == column + 1)) {
 		if (board.map[row][column + 1] == '.')
 			stones++;
 		if (board.map[row][column + 1] == stone_type)
 			stones += free_places(stone_type, row, column + 1, row, column);
 	}
-	if (column - 1 >= 0) {
+	if (column - 1 >= 0 && !(row == previous_row && previous_column == column-1) ) {
 		if (board.map[row][column - 1] == '.')
 			stones++;
 		if (board.map[row][column - 1] == stone_type)
 			stones += free_places(stone_type, row, column - 1, row, column );
 	}
 
-	if (row + 1 < board.size) {
+	if (row + 1 < board.size && !(row+1 == previous_row && previous_column == column)) {
 		if (board.map[row+1][column] == '.')
 			stones++;
 		if (board.map[row+1][column] == stone_type)
 			stones += free_places(stone_type, row+1, column, row, column);
 	}
-	if (row - 1 >= 0) {
+	if (row - 1 >= 0 && !(row-1 == previous_row && previous_column == column)) {
 		if (board.map[row-1][column] == '.')
 			stones++;
 		if (board.map[row-1][column] == stone_type)
@@ -107,7 +107,7 @@ void play_move(uint8_t turn, int row, int column) { //after validation so we kno
 			scores[static_cast<int>(turn)] += take_all_stones(opposite_c, row, column + 1, -1, -1);
 	}
 	if (row - 1 >= 0 && board.map[row-1][column] == opposite_c) { //check up
-		fplaces = free_places(opposite_c, row-1, column, -1, -1); //count number of free spaces around the stone
+		fplaces = free_places(opposite_c, row-1, column, -1, -1); //count number of free spaces around the stone, tu mi skoci error
 		if (fplaces == 0)
 			scores[static_cast<int>(turn)] += take_all_stones(opposite_c, row-1, column, -1, -1);
 	}
@@ -145,6 +145,8 @@ int start_game(std::string argument) {
 		std::stringstream s(buffer);
 		while (!s.eof()) {
 			if (s >> row && s >> column) {
+				if (row == 2 && column == 0)
+					std::cout << '\n';
 				if (row < 0 || row >= board.size || column < 0 || column >= board.size) // check if we are out of map
 					return 1;
 				if (board.map[row][column] != '.') //invalid step
@@ -167,7 +169,7 @@ int start_game(std::string argument) {
 						else {
 							std::cout << scores[0] << " " << scores[1];
 						}
-						return 1;
+						return 0;
 					}
 					else
 						pass_flag = 1;
