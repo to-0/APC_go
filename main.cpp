@@ -11,6 +11,7 @@ struct Board {
 };
 Board board;
 std::vector<Board> history; 
+int take_all_stones(char stone_type, int row, int column, int previous_row, int previous_column, int start_row, int start_column);
 
 std::vector<int> scores;
 std::vector<std::vector<int>> checked;
@@ -90,8 +91,41 @@ void convert_uppercase(char lowercase_stone_type, char stone_type, int row, int 
 		convert_uppercase(lowercase_stone_type, stone_type, row, column+1);
 
 }
+int check_and_take_opponents_stones(uint8_t turn, int row, int column) {
+	char opposite_c = (turn == 0) ? 'O' : 'X';
+	char lowercase_opposite = opposite_c == 'X' ? 'x' : 'o';
+	//look for opposite character next to you to check if we didn't close them 
+	int fplaces{ 0 };
+	int taken_stones = 0;
+	if (column - 1 >= 0 && board.map[row][column - 1] == opposite_c) { //check left
+		fplaces = free_places(opposite_c, row, column - 1, -1, -1, row, column); //count number of free spaces around the stone
+		convert_uppercase(lowercase_opposite, opposite_c, row, column - 1);
+		if (fplaces == 0)
+			taken_stones += take_all_stones(opposite_c, row, column - 1, -1, -1, row, column);
+	}
+	if (column + 1 < board.size && board.map[row][column + 1] == opposite_c) { //check right
+		fplaces = free_places(opposite_c, row, column + 1, -1, -1, row, column); //count number of free spaces around the stone
+		convert_uppercase(lowercase_opposite, opposite_c, row, column + 1);
+		if (fplaces == 0)
+			taken_stones += take_all_stones(opposite_c, row, column + 1, -1, -1, row, column);
+	}
+	if (row - 1 >= 0 && board.map[row - 1][column] == opposite_c) { //check up
+		fplaces = free_places(opposite_c, row - 1, column, -1, -1, row, column); //count number of free spaces around the stone, tu mi skoci error
+		convert_uppercase(lowercase_opposite, opposite_c, row - 1, column);
+		if (fplaces == 0)
+			taken_stones += take_all_stones(opposite_c, row - 1, column, -1, -1, row, column);
+	}
+	if (row + 1 < board.size && board.map[row + 1][column] == opposite_c) { //check down
+		fplaces = free_places(opposite_c, row + 1, column, -1, -1, row, column); //count number of free spaces around the stone
+		convert_uppercase(lowercase_opposite, opposite_c, row + 1, column);
+		if (fplaces == 0)
+			taken_stones += take_all_stones(opposite_c, row + 1, column, -1, -1, row, column);
+	}
+	return taken_stones;
+}
 
-int check_ko_suicide(char stone_type, int row, int column) {
+
+int validate_move_take_stones(uint8_t turn, char stone_type, int row, int column) {
 	//check ko
 	for (size_t i = 0; i < history.size(); i++) {
 		if (compare_boards(board, history[i]) == 0) { // board are equal it would be ko move
@@ -99,15 +133,20 @@ int check_ko_suicide(char stone_type, int row, int column) {
 			return 1;
 		}
 	}
-	int stones = free_places(stone_type, row, column, -1, -1, row, column);
-	if (row == 2 && column == 3) {
-		std::cout << "TU";
+	int taken_stones = check_and_take_opponents_stones(turn, row, column);
+	if (taken_stones != 0) {
+		board.map[row][column] = stone_type;
+		return 0;
 	}
+
+	// we didn't take any stones so we have to check freedoms
+	board.map[row][column] = stone_type;
+	int stones = free_places(stone_type, row, column, -1, -1, row, column);
 	char c = stone_type == 'X' ? 'x' : 'o';
 	convert_uppercase(c, stone_type, row, column);
 	std::cout << "Slobody " << stones << "\n";
 	if (stones == 0) {
-		board.map[row][column] = '.';
+		board.map[row][column] = '.'; //undo the step
 		return 1;
 	}
 		
@@ -137,39 +176,6 @@ int take_all_stones(char stone_type, int row, int column, int previous_row, int 
 		return stones + take_all_stones(stone_type, row - 1, column, row, column, start_row, start_column);
 	}
 	return stones;
-}
-void play_move(uint8_t turn, int row, int column) { //after validation so we know there is an empty space in that row column
-	char c = (turn == 0) ? 'X' : 'O';
-	char opposite_c = (turn == 0) ? 'O' : 'X';
-	std::cout << "Playing move\n"; 
-	board.map[row][column] = c; // play the move
-	char lowercase_opposite = opposite_c == 'X' ? 'x' : 'o';
-	//look for opposite character next to you to check if we didn't close them 
-	int fplaces{ 0 };
-	if (column - 1 >= 0 && board.map[row][column - 1] == opposite_c) { //check left
-		fplaces = free_places(opposite_c, row, column - 1, -1, -1, row, column); //count number of free spaces around the stone
-		convert_uppercase(lowercase_opposite, opposite_c, row, column - 1);
-		if (fplaces == 0)
-			scores[static_cast<int>(turn)] += take_all_stones(opposite_c, row, column - 1, -1, -1, row, column);
-	}
-	if (column + 1 < board.size && board.map[row][column + 1] == opposite_c) { //check right
-		fplaces = free_places(opposite_c, row, column + 1, -1, -1, row, column); //count number of free spaces around the stone
-		convert_uppercase(lowercase_opposite, opposite_c, row, column + 1);
-		if (fplaces == 0)
-			scores[static_cast<int>(turn)] += take_all_stones(opposite_c, row, column + 1, -1, -1, row, column);
-	}
-	if (row - 1 >= 0 && board.map[row-1][column] == opposite_c) { //check up
-		fplaces = free_places(opposite_c, row-1, column, -1, -1, row, column); //count number of free spaces around the stone, tu mi skoci error
-		convert_uppercase(lowercase_opposite, opposite_c, row-1, column);
-		if (fplaces == 0)
-			scores[static_cast<int>(turn)] += take_all_stones(opposite_c, row-1, column, -1, -1, row, column);
-	}
-	if (row + 1 < board.size && board.map[row + 1][column] == opposite_c) { //check down
-		fplaces = free_places(opposite_c, row +1, column,-1, -1, row, column); //count number of free spaces around the stone
-		convert_uppercase(lowercase_opposite, opposite_c, row+1, column);
-		if (fplaces == 0)
-			scores[static_cast<int>(turn)] += take_all_stones(opposite_c, row + 1, column, -1, -1, row, column);
-	}
 }
 
 
@@ -201,9 +207,8 @@ int start_game(std::string argument) {
 					continue;
 				else {
 					c = (turn == 0) ? 'X' : 'O';
-					if (check_ko_suicide(c, row, column) == 0) { //step doesnt cause ko or suicide
+					if (validate_move_take_stones(turn, c, row, column) == 0) { //step doesnt cause ko or suicide , we also took stones, also does the step
 						std::cout << row << " " << column << "\n";
-						play_move(turn, row, column);
 						draw_map();
 						turn = (turn + 1) % 2;
 						std::cout << "--------\n";
