@@ -100,11 +100,17 @@ int check_ko_suicide(char stone_type, int row, int column) {
 		}
 	}
 	int stones = free_places(stone_type, row, column, -1, -1, row, column);
+	if (row == 2 && column == 3) {
+		std::cout << "TU";
+	}
 	char c = stone_type == 'X' ? 'x' : 'o';
 	convert_uppercase(c, stone_type, row, column);
 	std::cout << "Slobody " << stones << "\n";
-	if (stones == 0)
+	if (stones == 0) {
+		board.map[row][column] = '.';
 		return 1;
+	}
+		
 	return 0;
 }
 int take_all_stones(char stone_type, int row, int column, int previous_row, int previous_column, int start_row, int start_column) {
