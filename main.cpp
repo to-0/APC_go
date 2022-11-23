@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string>
 #include <sstream>
+#include <tuple>
 
 struct Board {
 	std::vector<std::vector<char>> map;
@@ -11,7 +12,8 @@ struct Board {
 };
 Board board;
 std::vector<Board> history; 
-int take_all_stones(char stone_type, int row, int column, int previous_row, int previous_column, int start_row, int start_column);
+int take_all_stones(char stone_type, int row, int column);
+std::vector<char> border_chars; // 
 
 std::vector<int> scores;
 std::vector<std::vector<int>> checked;
@@ -32,50 +34,101 @@ void draw_map() {
 		std::cout << '\n';
 	}
 }
+int calculate_area(int row, int column) {
+	int area = 1;
+	board.map[row][column] = 'A';
 
-int free_places(char stone_type, int row, int column, int previous_row, int previous_column, int start_row, int start_column) { //check all frees near the played move
-	/*
-	std::cout << "Free places \n";
-	std::cout << row << " " << column << " previous row:" << previous_row << " previous column " << previous_column << " starting row " << start_row << " starting column " << start_column << "\n";
-	
-	if (previous_row == row && previous_column == column)
-		return 0;
-	if (start_row == row && start_column == column && previous_row != -1 && previous_column != -1) //we came full circle
-		return 0;
-	*/
+	if (row - 1 >= 0) { //check up
+		if (board.map[row - 1][column] == '.')
+			return area + calculate_area(row - 1, column);
+		if (board.map[row - 1][column] == 'X' || board.map[row - 1][column] == 'O') {
+			border_chars.push_back(board.map[row - 1][column]);
+		}
+	}
+	if (row + 1 < board.size) { //check down
+		if (board.map[row + 1][column] == '.')
+			return area + calculate_area(row + 1, column);
+		if (board.map[row + 1][column] == 'X' || board.map[row + 1][column] == 'O') {
+			border_chars.push_back(board.map[row + 1][column]);
+		}
+	}
+	if (column - 1 >= 0) { //check left
+		if (board.map[row][column-1] == '.')
+			return area + calculate_area(row, column-1);
+		if (board.map[row][column-1] == 'X' || board.map[row][column-1] == 'O') {
+			border_chars.push_back(board.map[row][column-1]);
+		}
+	}
+	if (column + 1 < board.size) { //check right
+		if (board.map[row][column + 1] == '.')
+			return area + calculate_area(row, column + 1);
+		if (board.map[row][column + 1] == 'X' || board.map[row][column + 1] == 'O') {
+			border_chars.push_back(board.map[row][column + 1]);
+		}
+	}
+	return area;
+}
+void areas() {
+	for (int i = 0; i < board.size; i++) {
+		for (int j = 0; j < board.size; j++) {
+			if (board.map[i][j] == '.') {
+				int area = calculate_area(i, j);
+				//check if one player surounds the area
+				char checked_char=' ';
+				bool equal = true;
+				if (border_chars.size() > 0)
+					checked_char = border_chars[0];
+				for (size_t index = 1; index < border_chars.size(); index++) {
+					if (checked_char != border_chars[index]) {
+						equal = false;
+						break;
+					}
+				}
+				if (equal) {
+					int player_index = checked_char == 'X' ? 0 : 1;
+					std::cout << area << "\n";
+					scores[player_index] += area;
+				}
+				border_chars.clear(); // empty the list
+			}
+		}
+	}
+}
+
+int free_places(char stone_type, int row, int column) { //check all frees near the played move
 	int stones{ 0 };
 	char c = stone_type == 'X'? 'x': 'o';
 	board.map[row][column] = c; //convert to lowercase to avoid infinite recursion or counting some symbols more than once
-	if ((column + 1) < board.size && !(row == previous_row && previous_column == column + 1)) {
+	if ((column + 1) < board.size) {
 		if (board.map[row][column + 1] == '.')
 			stones++;
 		if (board.map[row][column + 1] == stone_type) {
-			stones += free_places(stone_type, row, column + 1, row, column, start_row, start_column);
+			stones += free_places(stone_type, row, column + 1);
 		}
 	}
-	if (column - 1 >= 0 && !(row == previous_row && previous_column == column-1)) {
+	if (column - 1 >= 0) {
 		if (board.map[row][column - 1] == '.') {
 			stones++;
 		}
 		if (board.map[row][column - 1] == stone_type) {
-			stones += free_places(stone_type, row, column - 1, row, column, start_row, start_column);
+			stones += free_places(stone_type, row, column - 1);
 		}
 			
 	}
 
-	if (row + 1 < board.size && !(row + 1 == previous_row && previous_column == column)) {
+	if (row + 1 < board.size) {
 		if (board.map[row + 1][column] == '.')
 			stones++;
 		if (board.map[row + 1][column] == stone_type) {
-			stones += free_places(stone_type, row + 1, column, row, column, start_row, start_column);
+			stones += free_places(stone_type, row + 1, column);
 		}
 			
 	}
-	if (row - 1 >= 0 && !(row-1 == previous_row && previous_column == column)) {
+	if (row - 1 >= 0) {
 		if (board.map[row-1][column] == '.')
 			stones++;
 		if (board.map[row-1][column] == stone_type)
-			stones += free_places(stone_type, row-1, column, row, column, start_row, start_column);
+			stones += free_places(stone_type, row-1, column);
 	}
 	return stones;
 }
@@ -98,28 +151,28 @@ int check_and_take_opponents_stones(uint8_t turn, int row, int column) {
 	int fplaces{ 0 };
 	int taken_stones = 0;
 	if (column - 1 >= 0 && board.map[row][column - 1] == opposite_c) { //check left
-		fplaces = free_places(opposite_c, row, column - 1, -1, -1, row, column); //count number of free spaces around the stone
+		fplaces = free_places(opposite_c, row, column - 1); //count number of free spaces around the stone
 		convert_uppercase(lowercase_opposite, opposite_c, row, column - 1);
 		if (fplaces == 0)
-			taken_stones += take_all_stones(opposite_c, row, column - 1, -1, -1, row, column);
+			taken_stones += take_all_stones(opposite_c, row, column - 1);
 	}
 	if (column + 1 < board.size && board.map[row][column + 1] == opposite_c) { //check right
-		fplaces = free_places(opposite_c, row, column + 1, -1, -1, row, column); //count number of free spaces around the stone
+		fplaces = free_places(opposite_c, row, column + 1); //count number of free spaces around the stone
 		convert_uppercase(lowercase_opposite, opposite_c, row, column + 1);
 		if (fplaces == 0)
-			taken_stones += take_all_stones(opposite_c, row, column + 1, -1, -1, row, column);
+			taken_stones += take_all_stones(opposite_c, row, column + 1);
 	}
 	if (row - 1 >= 0 && board.map[row - 1][column] == opposite_c) { //check up
-		fplaces = free_places(opposite_c, row - 1, column, -1, -1, row, column); //count number of free spaces around the stone, tu mi skoci error
+		fplaces = free_places(opposite_c, row - 1, column); //count number of free spaces around the stone, tu mi skoci error
 		convert_uppercase(lowercase_opposite, opposite_c, row - 1, column);
 		if (fplaces == 0)
-			taken_stones += take_all_stones(opposite_c, row - 1, column, -1, -1, row, column);
+			taken_stones += take_all_stones(opposite_c, row - 1, column);
 	}
 	if (row + 1 < board.size && board.map[row + 1][column] == opposite_c) { //check down
-		fplaces = free_places(opposite_c, row + 1, column, -1, -1, row, column); //count number of free spaces around the stone
+		fplaces = free_places(opposite_c, row + 1, column); //count number of free spaces around the stone
 		convert_uppercase(lowercase_opposite, opposite_c, row + 1, column);
 		if (fplaces == 0)
-			taken_stones += take_all_stones(opposite_c, row + 1, column, -1, -1, row, column);
+			taken_stones += take_all_stones(opposite_c, row + 1, column);
 	}
 	return taken_stones;
 }
@@ -133,15 +186,18 @@ int validate_move_take_stones(uint8_t turn, char stone_type, int row, int column
 			return 1;
 		}
 	}
+	board.map[row][column] = stone_type;
+	if (row == 2 && column == 3)
+		std::cout << "Hey\n";
 	int taken_stones = check_and_take_opponents_stones(turn, row, column);
 	if (taken_stones != 0) {
-		board.map[row][column] = stone_type;
+		std::cout << "Taken stones " << taken_stones << "\n";
+		scores[turn] += taken_stones;
 		return 0;
 	}
 
 	// we didn't take any stones so we have to check freedoms
-	board.map[row][column] = stone_type;
-	int stones = free_places(stone_type, row, column, -1, -1, row, column);
+	int stones = free_places(stone_type, row, column);
 	char c = stone_type == 'X' ? 'x' : 'o';
 	convert_uppercase(c, stone_type, row, column);
 	std::cout << "Slobody " << stones << "\n";
@@ -152,28 +208,23 @@ int validate_move_take_stones(uint8_t turn, char stone_type, int row, int column
 		
 	return 0;
 }
-int take_all_stones(char stone_type, int row, int column, int previous_row, int previous_column, int start_row, int start_column) {
-	std::cout << row << " " << column << " previous row:" << previous_row << " previous column " << previous_column << " starting row " << start_row << " starting column " << start_column;
-	/*
+int take_all_stones(char stone_type, int row, int column) {
 	if (board.map[row][column] == '.')
 		return 0;
-	if (previous_row == row && previous_column == column)
-		return 0;
-	*/
 	board.map[row][column] = '.';
 	int stones{ 1 };
 	if (column + 1 < board.size && (board.map[row][column + 1] == stone_type)) {
-		return stones + take_all_stones(stone_type,row,column+1,row,column, start_row, start_column);
+		return stones + take_all_stones(stone_type,row,column+1);
 	}
 	if (column - 1 >= 0 && board.map[row][column -1] == stone_type) {
-		return stones + take_all_stones(stone_type, row, column-1, row, column, start_row, start_column);
+		return stones + take_all_stones(stone_type, row, column-1);
 	}
 
 	if (row + 1 < board.size && board.map[row + 1][column] == stone_type) {
-		return stones + take_all_stones(stone_type, row+1, column,row,column, start_row, start_column);
+		return stones + take_all_stones(stone_type, row+1, column);
 	}
 	if (row - 1 >= 0 && board.map[row - 1][column] == stone_type) {
-		return stones + take_all_stones(stone_type, row - 1, column, row, column, start_row, start_column);
+		return stones + take_all_stones(stone_type, row - 1, column);
 	}
 	return stones;
 }
@@ -209,10 +260,10 @@ int start_game(std::string argument) {
 					c = (turn == 0) ? 'X' : 'O';
 					if (validate_move_take_stones(turn, c, row, column) == 0) { //step doesnt cause ko or suicide , we also took stones, also does the step
 						std::cout << row << " " << column << "\n";
-						draw_map();
 						turn = (turn + 1) % 2;
-						std::cout << "--------\n";
 					}
+					draw_map();
+					std::cout << "--------\n";
 				}
 			}
 			else {
@@ -222,7 +273,8 @@ int start_game(std::string argument) {
 					if (pass_flag == 1) { //2x pass 
 						if(argument == "--board")
 							draw_map();
-						else {
+						else if (argument == "--score") {
+							areas();
 							std::cout << scores[0] << " " << scores[1];
 						}
 						return 0;
@@ -231,8 +283,11 @@ int start_game(std::string argument) {
 						pass_flag = 1;
 					turn = (turn + 1) % 2;
 				}
-				else
-					return 1; // we read some bullshit
+				else {
+					continue;
+					//return 1; // we read some bullshit
+				}
+					
 			}
 		}
 	} 
@@ -265,6 +320,6 @@ int main(int argc, char* argv[])
 	}
 	scores.resize(2);
 	scores[0] = 0; //player1
-	scores[1] = 1; //player2
+	scores[1] = 0; //player2
 	return start_game(std::string(argv[2]));
 }
