@@ -73,7 +73,6 @@ void areas() {
 		for (int j = 0; j < board.size; j++) {
 			if (board.map[i][j] == '.') {
 				int area = calculate_area(i, j);
-				draw_map();
 				//check if one player surounds the area
 				char checked_char=' ';
 				bool equal = true;
@@ -90,7 +89,7 @@ void areas() {
 					if (checked_char == 'X')
 						player_index = 0;
 					else if (checked_char == 'O')
-						player_index = 0;
+						player_index = 1;
 
 					//std::cout << area << "\n";
 					if(player_index != -1)
@@ -183,20 +182,33 @@ int check_and_take_opponents_stones(uint8_t turn, int row, int column) {
 	}
 	return taken_stones;
 }
-
-
-int validate_move_take_stones(uint8_t turn, char stone_type, int row, int column) {
+void undo_all() {
+	size_t index = history.size() - 1;
+	for (int i = 0; i < board.size; i++) {
+		for (int j = 0; j < board.size; j++) {
+			board.map[i][j] = history[index].map[i][j];
+		}
+	}
+}
+int check_ko() {
 	//check ko
 	for (size_t i = 0; i < history.size(); i++) {
 		if (compare_boards(board, history[i]) == 0) { // board are equal it would be ko move
-			std::cout << "Equal boards";
 			return 1;
 		}
 	}
+	return 0;
+}
+
+int validate_move_take_stones(uint8_t turn, char stone_type, int row, int column) {
 	board.map[row][column] = stone_type;
 	int taken_stones = check_and_take_opponents_stones(turn, row, column);
 	if (taken_stones != 0) {
 		//std::cout << "Taken stones " << taken_stones << "\n";
+		if (check_ko() == 1) {
+			undo_all();
+			return 1;
+		}
 		scores[turn] += taken_stones;
 		return 0;
 	}
@@ -234,7 +246,6 @@ int take_all_stones(char stone_type, int row, int column) {
 	return stones;
 }
 
-
 int start_game(std::string argument) {
 	//std::string buffer;
 	uint8_t turn{ 0 }; //which player's turn is it
@@ -252,7 +263,7 @@ int start_game(std::string argument) {
 	char c{ 'X' };
 	while (true) {// read input
 			if (std::cin >> row && std::cin >> column) {
-				pass_flag = 0;
+				
 				if (row < 0 || row >= board.size || column < 0 || column >= board.size) // check if we are out of map
 					return 1;
 				if (board.map[row][column] != '.') //invalid step
@@ -262,6 +273,9 @@ int start_game(std::string argument) {
 					if (validate_move_take_stones(turn, c, row, column) == 0) { //step doesnt cause ko or suicide , we also took stones, also does the step
 						//std::cout << row << " " << column << "\n";
 						turn = (turn + 1) % 2;
+						pass_flag = 0;
+						history.push_back(board); //add to history
+						//draw_map();
 					}
 					//draw_map();
 					//std::cout << "--------\n";
@@ -277,9 +291,10 @@ int start_game(std::string argument) {
 							return 0;
 						}
 						else if (argument == "--score") {
-							draw_map();
+							//draw_map();
+							//std::cout << "Before area\n";
+							//std::cout << scores[0] << " " << scores[1]<< "\n";
 							areas();
-							draw_map();
 							std::cout << scores[0] << " " << scores[1];
 							return 0;
 						}
